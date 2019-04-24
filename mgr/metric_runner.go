@@ -396,6 +396,15 @@ func (mr *MetricRunner) Stop() {
 	case <-timer.C:
 		log.Warnf("MetricRunner " + mr.Name() + " exited timeout ")
 	}
+	for _, collector := range mr.collectors {
+		collectorClose, ok := collector.(metric.CollectorClose)
+		if !ok {
+			continue
+		}
+		if err := collectorClose.Close(); err != nil {
+			log.Errorf("cannot close collect name: %s, err: %v", collector.Name(), err)
+		}
+	}
 	for _, s := range mr.senders {
 		err := s.Close()
 		if err != nil {
@@ -426,6 +435,15 @@ func (mr *MetricRunner) Reset() (err error) {
 }
 
 func (mr *MetricRunner) Delete() (err error) {
+	for _, collector := range mr.collectors {
+		collectorClose, ok := collector.(metric.CollectorClose)
+		if !ok {
+			continue
+		}
+		if err := collectorClose.Close(); err != nil {
+			log.Errorf("cannot close collect name: %s, err: %v", collector.Name(), err)
+		}
+	}
 	return mr.meta.Delete()
 }
 

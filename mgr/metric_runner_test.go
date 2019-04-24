@@ -197,9 +197,6 @@ func metricRunTest(p *testParam) {
 	assert.NoError(t, err, string(respBody))
 	assert.Equal(t, http.StatusOK, respCode)
 	time.Sleep(3 * time.Second)
-	base := filepath.Base("")
-	metaPath := "meta/" + runnerName + "_" + Hash(base)
-	assert.True(t, utils.IsExist(metaPath))
 
 	// 停止 runner
 	url = "http://127.0.0.1" + rs.address + "/logkit/configs/" + runnerName + "/stop"

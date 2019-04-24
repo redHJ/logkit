@@ -28,6 +28,10 @@ type Collector interface {
 	Collect() ([]map[string]interface{}, error)
 }
 
+type CollectorClose interface {
+	Close() error
+}
+
 // 供外部插件实现
 // SyncConfig 与 Config 对应 获取配置项后同步配置给插件
 type ExtCollector interface {
