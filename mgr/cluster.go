@@ -10,11 +10,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/qiniu/log"
-	. "github.com/qiniu/logkit/utils/models"
-
 	"github.com/json-iterator/go"
 	"github.com/labstack/echo"
+
+	"github.com/qiniu/log"
+	. "github.com/qiniu/logkit/utils/models"
 )
 
 type ClusterConfig struct {

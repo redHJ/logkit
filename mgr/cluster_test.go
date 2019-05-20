@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -33,6 +34,11 @@ type respClusterStatus struct {
 type respSlaveConfig struct {
 	Code string                 `json:"code"`
 	Data map[string]SlaveConfig `json:"data"`
+}
+
+type respIsMaster struct {
+	Code string `json:"code"`
+	Data bool   `json:"data"`
 }
 
 const (
@@ -568,6 +574,20 @@ func clusterStartStopTest(p *testCluParam) {
 		assert.Equal(t, true, ok)
 		assert.Equal(t, ex, act)
 	}
+
+	url = rs[0].cluster.Address + "/logkit/cluster/ismaster"
+	respCode, respBody, err = makeRequest(url, http.MethodGet, runnerConf)
+	assert.Nil(t, err)
+	assert.Equal(t, http.StatusOK, respCode)
+	var isMaster respIsMaster
+	err = jsoniter.Unmarshal(respBody, &isMaster)
+	assert.True(t, isMaster.Data)
+	assert.EqualValues(t, "L200", isMaster.Code)
+
+	url = rs[0].cluster.Address + "/logkit/cluster/ping"
+	respCode, _, err = makeRequest(url, http.MethodGet, runnerConf)
+	assert.Nil(t, err)
+	assert.Equal(t, http.StatusOK, respCode)
 }
 
 func clusterResetDeleteTest(p *testCluParam) {
@@ -1106,4 +1126,52 @@ func TestJsoniter(t *testing.T) {
 	err = stjson.Unmarshal([]byte(teststring), &respGotConfigs2)
 	assert.NoError(t, err)
 	assert.Equal(t, respGotConfigs1, respGotConfigs2)
+}
+
+func Test_registerOneErr(t *testing.T) {
+	t.Parallel()
+	err := registerOne("", "", "")
+	assert.NotNil(t, err)
+	assert.EqualValues(t, "master host is not configed", err.Error())
+
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusBadRequest)
+		io.WriteString(w, "hello world")
+	}))
+	defer ts.Close()
+	err = registerOne(ts.URL, "", "")
+	assert.NotNil(t, err)
+	assert.EqualValues(t, "hello world", err.Error())
+
+	err = Register([]string{ts.URL}, "", "")
+	assert.NotNil(t, err)
+	assert.EqualValues(t, "register "+ts.URL+" error hello world", err.Error())
+
+	ts2 := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		io.WriteString(w, "hello world")
+	}))
+	defer ts2.Close()
+	err = Register([]string{ts.URL, ts2.URL}, "", "")
+	assert.Nil(t, err)
+}
+
+func Test_executeToOneClusterErr(t *testing.T) {
+	t.Parallel()
+	_, _, err := executeToOneCluster("", "TEST TEST", []byte("hello world"))
+	assert.NotNil(t, err)
+
+	_, _, err = executeToOneCluster("", "", []byte("hello world"))
+	assert.NotNil(t, err)
+}
+
+func Test_getQualifySlavesErr(t *testing.T) {
+	t.Parallel()
+	_, err := getQualifySlaves([]Slave{{
+		Url:    "url",
+		Tag:    "tag",
+		Status: "test",
+	}}, "", "")
+	assert.NotNil(t, err)
+	assert.EqualValues(t, "the slaves(tag = '', url = '') status is test, options are terminated", err.Error())
 }
