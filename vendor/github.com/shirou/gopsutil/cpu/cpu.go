@@ -59,7 +59,7 @@ var invoke common.Invoker = common.Invoke{}
 func init() {
 	lastCPUPercent.Lock()
 	lastCPUPercent.lastCPUTimes, _ = Times(false)
-	lastCPUPercent.lastPerCPUTimes, _ = Times(true)
+	//lastCPUPercent.lastPerCPUTimes, _ = Times(true)
 	lastCPUPercent.Unlock()
 }
 

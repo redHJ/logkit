@@ -141,7 +141,8 @@ func IOCountersWithContext(ctx context.Context, names ...string) (map[string]IOC
 	ret := make(map[string]IOCountersStat, 0)
 	var dst []Win32_PerfFormattedData
 
-	err := common.WMIQueryWithContext(ctx, "SELECT * FROM Win32_PerfFormattedData_PerfDisk_LogicalDisk", &dst)
+	err := common.WMIQueryWithContext(ctx, "SELECT Name, AvgDiskBytesPerRead, AvgDiskBytesPerWrite, AvgDiskReadQueueLength, " +
+		"AvgDiskWriteQueueLength, AvgDisksecPerRead, AvgDisksecPerWrite FROM Win32_PerfFormattedData_PerfDisk_LogicalDisk", &dst)
 	if err != nil {
 		return ret, err
 	}

@@ -7,6 +7,7 @@ import (
 
 	"github.com/shirou/gopsutil/cpu"
 
+	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/metric/system/utils"
 )
 
@@ -79,6 +80,7 @@ func isTotalCpuUsageStat(name string) bool {
 }
 
 func (s *CPUStats) CPUTimes(perCPU, totalCPU bool) ([]cpu.TimesStat, error) {
+	log.Infof("test CPUTimes perCPU, totalCPU", perCPU, totalCPU)
 	var cpuTimes []cpu.TimesStat
 	if perCPU {
 		if perCPUTimes, err := utils.Times(true); err == nil {

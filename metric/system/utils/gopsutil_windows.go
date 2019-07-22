@@ -8,9 +8,11 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"time"
 	"unsafe"
 
 	"github.com/StackExchange/wmi"
+	"github.com/qiniu/log"
 	"github.com/shirou/gopsutil/cpu"
 	"github.com/shirou/gopsutil/net"
 	"golang.org/x/sys/windows"
@@ -20,7 +22,15 @@ var (
 	Modkernel32 = windows.NewLazyDLL("kernel32.dll")
 
 	ProcGetSystemTimes = Modkernel32.NewProc("GetSystemTimes")
+
+	Timeout = 3 * time.Second
 )
+
+const (
+	win32_TicksPerSecond = 10000000.0
+)
+
+// 兼容windows 2008之前版本，
 
 type FILETIME struct {
 	DwLowDateTime  uint32
@@ -49,6 +59,7 @@ func Times(percpu bool) ([]cpu.TimesStat, error) {
 
 func TimesWithContext(ctx context.Context, percpu bool) ([]cpu.TimesStat, error) {
 	if percpu {
+		log.Infof("LLLLL TimesWithContext percpu: %v", percpu)
 		return perCPUTimes()
 	}
 
@@ -82,6 +93,7 @@ func TimesWithContext(ctx context.Context, percpu bool) ([]cpu.TimesStat, error)
 
 // perCPUTimes returns times stat per cpu, per core and overall for all CPUs
 func perCPUTimes() ([]cpu.TimesStat, error) {
+	log.Infof("LLLLL perCPUTimes")
 	var ret []cpu.TimesStat
 	stats, err := PerfInfo()
 	if err != nil {
@@ -90,10 +102,10 @@ func perCPUTimes() ([]cpu.TimesStat, error) {
 	for _, v := range stats {
 		c := cpu.TimesStat{
 			CPU:    v.Name,
-			User:   float64(v.PercentUserTime),
-			System: float64(v.PercentPrivilegedTime),
-			Idle:   float64(v.PercentIdleTime),
-			Irq:    float64(v.PercentInterruptTime),
+			User:   float64(v.PercentUserTime) / win32_TicksPerSecond,
+			System: float64(v.PercentPrivilegedTime) / win32_TicksPerSecond,
+			Idle:   float64(v.PercentIdleTime) / win32_TicksPerSecond,
+			Irq:    float64(v.PercentInterruptTime) / win32_TicksPerSecond,
 		}
 		ret = append(ret, c)
 	}
@@ -104,13 +116,15 @@ func perCPUTimes() ([]cpu.TimesStat, error) {
 // Name property is the key by which overall, per cpu and per core metric is known.
 // 已知问题： windows xp PercentIdleTime 为0
 func PerfInfo() ([]Win32_PerfFormattedData_PerfOS_Processor, error) {
+	log.Infof("LLLLL PerfInfo")
 	return PerfInfoWithContext(context.Background())
 }
 
 func PerfInfoWithContext(ctx context.Context) ([]Win32_PerfFormattedData_PerfOS_Processor, error) {
+	log.Infof("LLLLL PerfInfoWithContext")
 	var ret []Win32_PerfFormattedData_PerfOS_Processor
 
-	q := wmi.CreateQuery(&ret, "")
+	q := wmi.CreateQuery(&ret, "WHERE NOT Name LIKE '%_Total'")
 	err := WMIQueryWithContext(ctx, q, &ret)
 	if err != nil {
 		return []Win32_PerfFormattedData_PerfOS_Processor{}, err
@@ -121,6 +135,12 @@ func PerfInfoWithContext(ctx context.Context) ([]Win32_PerfFormattedData_PerfOS_
 
 // WMIQueryWithContext - wraps wmi.Query with a timed-out context to avoid hanging
 func WMIQueryWithContext(ctx context.Context, query string, dst interface{}, connectServerArgs ...interface{}) error {
+	log.Infof("LLLLL WMIQueryWithContext query: %v, dst", query, dst)
+	if _, ok := ctx.Deadline(); !ok {
+		ctxTimeout, cancel := context.WithTimeout(ctx, Timeout)
+		defer cancel()
+		ctx = ctxTimeout
+	}
 	errChan := make(chan error, 1)
 	go func() {
 		errChan <- wmi.Query(query, dst, connectServerArgs...)
@@ -135,6 +155,7 @@ func WMIQueryWithContext(ctx context.Context, query string, dst interface{}, con
 }
 
 func LoadPercentage() (uint16, error) {
+	log.Infof("LLLLL LoadPercentage")
 	var dst []cpu.Win32_Processor
 	var lp uint16
 	q := wmi.CreateQuery(&dst, "")

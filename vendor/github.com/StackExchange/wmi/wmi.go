@@ -39,6 +39,8 @@ import (
 
 	"github.com/go-ole/go-ole"
 	"github.com/go-ole/go-ole/oleutil"
+
+	ll "github.com/qiniu/log"
 )
 
 var l = log.New(os.Stdout, "", log.LstdFlags)
@@ -123,6 +125,7 @@ var DefaultClient = &Client{}
 // changed using connectServerArgs. See
 // http://msdn.microsoft.com/en-us/library/aa393720.aspx for details.
 func (c *Client) Query(query string, dst interface{}, connectServerArgs ...interface{}) error {
+	ll.Infof("LLLLL Query: query", query)
 	dv := reflect.ValueOf(dst)
 	if dv.Kind() != reflect.Ptr || dv.IsNil() {
 		return ErrInvalidEntityType
@@ -147,6 +150,7 @@ func (c *Client) Query(query string, dst interface{}, connectServerArgs ...inter
 	}
 	defer ole.CoUninitialize()
 
+	time1 := time.Now().UnixNano()
 	unknown, err := oleutil.CreateObject("WbemScripting.SWbemLocator")
 	if err != nil {
 		return err
@@ -154,12 +158,16 @@ func (c *Client) Query(query string, dst interface{}, connectServerArgs ...inter
 		return ErrNilCreateObject
 	}
 	defer unknown.Release()
+	time2 := time.Now().UnixNano()
+	ll.Infof("LLLLL CreateObject take: %d", time2-time1)
 
 	wmi, err := unknown.QueryInterface(ole.IID_IDispatch)
 	if err != nil {
 		return err
 	}
 	defer wmi.Release()
+	time3 := time.Now().UnixNano()
+	ll.Infof("LLLLL QueryInterface take: %d", time3-time2)
 
 	// service is a SWbemServices
 	serviceRaw, err := oleutil.CallMethod(wmi, "ConnectServer", connectServerArgs...)
@@ -168,6 +176,8 @@ func (c *Client) Query(query string, dst interface{}, connectServerArgs ...inter
 	}
 	service := serviceRaw.ToIDispatch()
 	defer serviceRaw.Clear()
+	time4 := time.Now().UnixNano()
+	ll.Infof("LLLLL CallMethod take: %d", time4-time3)
 
 	// result is a SWBemObjectSet
 	resultRaw, err := oleutil.CallMethod(service, "ExecQuery", query)
@@ -176,6 +186,8 @@ func (c *Client) Query(query string, dst interface{}, connectServerArgs ...inter
 	}
 	result := resultRaw.ToIDispatch()
 	defer resultRaw.Clear()
+	time5 := time.Now().UnixNano()
+	ll.Infof("LLLLL ExecQuery query: %v, take: %d", query, time5-time4)
 
 	count, err := oleInt64(result, "Count")
 	if err != nil {
